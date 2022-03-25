@@ -1,0 +1,558 @@
+%% graphical method
+clear all
+format rat
+clc
+
+%% INPUT PARAMETER
+A=[1 2; 1 1; 1 -2];
+B=[10; 6; 1];
+
+%% PLOTTING LINES
+y1=0:1:max(B);
+x12=(B(1)-A(1,1)*y1)/A(1,2);
+x22=(B(2)-A(2,1)*y1)/A(2,2);
+x32=(B(3)-A(3,1)*y1)/A(3,2);
+x12=max(0,x12);
+x22=max(0,x22);
+x32=max(0,x32);
+plot(y1,x12,'r',y1,x22,'g',y1,x32,'b');
+grid on;
+title('x1 vs x2');
+xlabel('value of x1');
+ylabel('value of x2');
+
+%% FINDING CORNER POINTS
+cx1=find(y1==0);
+c1=find(x12==0);
+Line1=[y1(:,[c1 cx1]) ; x12(:,[c1 cx1])]';     
+c2=find(x22==0);
+Line2=[y1(:,[c2 cx1]) ; x22(:,[c2 cx1])]';
+c3=find(x32==0);
+Line3=[y1(:,[c3 cx1]) ; x32(:,[c3 cx1])]';
+cornerpts=unique([Line1;Line2;Line3],'rows');
+
+%% INTERSECTION POINTS
+pt=[];
+for i=1:size(A,1)      
+    A1=A(i,:);
+    B1=B(i,:);
+    for j=i+1:size(A,1)
+        A2=A(j,:);
+        B2=B(j,:);
+        P=[A1;A2];
+        Q=[B1;B2];
+        X=P\Q;
+        pt=[pt X];
+    end
+end
+ptt=pt';
+
+%% ALL CORNER AND INTERSECTION POINTS
+allpts=[ptt;cornerpts];
+points=unique(allpts,'rows');
+
+%% CONSTRAINTS OR FEASIBLE REGION
+x1=points(:,1);
+x2=points(:,2);
+cons1=x1+2*x2-10;
+h1=find(cons1>0);
+points(h1,:)=[];
+
+x1=points(:,1);
+x2=points(:,2);
+cons2=x1+x2-6;
+h2=find(cons2>0);
+points(h2,:)=[];
+
+x1=points(:,1);
+x2=points(:,2);
+cons3=x1-2*x2-1;
+h3=find(cons3>0);
+points(h3,:)=[];
+
+%% OBJECTIVE FUNCTION
+C=[2;1];
+for i=1:size(points,1)
+    fX(i,:)=points(i,:)*C;
+end
+obj=[points fX];
+maximum=max(fX);
+indexOfMax=find(fX==maximum);
+optimalSol=points(indexOfMax,:)
+zOptimal=maximum
+
+
+
+
+
+
+
+%%bfs
+clear all
+clc
+format rat
+%% PHASE 1: INPUT PARAMETER
+A=[1 1 1 0;2 1 0 1];          
+B=[450;600];
+C=[3 4 0 0];
+
+%% PHASE 2: SET OF ALL BASIC SOLUTIONS
+m=size(A,1);   
+n=size(A,2);
+if(n>m)
+    nCm=nchoosek(n,m)
+    pair=nchoosek(1:n,m)
+    sol=[];
+    for i=1:nCm
+        y=zeros(n,1)
+        x=A(:,pair(i,:))\B
+        if(x>=0 & x~=inf & x~=-inf)
+            y(pair(i,:))=x
+            sol=[sol,y]
+        end
+    end
+else
+    error('nCm does not exist')
+end
+
+%% BASIC FEASIBLE SOLUTION
+z=C*sol
+[Zmax,Zindex]=max(z)
+bfs1=sol(:,Zindex)
+bfs3=bfs1'
+optimal_value=[bfs3 Zmax]
+optimal_bfs=array2table(optimal_value);
+optimal_bfs.Properties.VariableNames(1:size(optimal_bfs,2))={'x1','x2','s1','s2','Z'}
+
+
+
+%%simplex
+
+clc
+clear
+format rat
+
+
+% Max Z=3x1+2x2
+% 2x1+x2<=18
+% 2x1+3x2<=42
+% 3x1+x2<=24
+
+%% PHASE 1: INPUT PARAMETER
+
+Z=[3 2];
+A=[2 1; 2 3; 3 1];
+B=[18; 42; 24];
+
+%% PHASE 2: COMPLETE MATRIX AND COST MATRIX
+
+s=eye(size(A,1));
+m=size(A,1);
+n=size(A,2);
+col=size(A,2);
+A=[A s B];
+Cj=zeros(1,size(A,2));
+% Cost Matrix
+Cj(1:n)=Z;
+
+%% PHASE 3: FIRST TABLE
+
+bv=n+1:size(A,2)-1;
+zjcj=Cj(bv)*A-Cj;
+fprintf("INITIAL TABLE:\n");
+ZjC=[zjcj; A];
+simpTable=array2table(ZjC);
+simpTable.Properties.VariableNames(1:size(ZjC,2))={'x1','x2','s1','s2','s3','Sol'};
+disp(simpTable);
+
+%% PHASE 4: SIMPLEX TABLES
+
+table=1;
+optimal=true;
+RUN=true;
+zc=zjcj(1:size(A,2)-1);
+
+while RUN
+    if any(zc<0)
+        zc=zjcj(1:size(A,2)-1);
+        [minvalzjcj, minindzjcj]=min(zc);
+        pivot_col_ind=minindzjcj;
+        pivot_col=A(:,pivot_col_ind);
+        if all(pivot_col<=0)
+            print('LPP is unbounded');
+            optimal=false;
+            break;
+        else
+            for i=1:size(pivot_col,1)
+                if pivot_col(i)>0
+                    ratio(i)=B(i)./pivot_col(i);
+                else
+                    ratio(i)=inf;
+                end
+            end
+            [min_ratio, ratio_ind]=min(ratio);
+            pivot_row_ind=ratio_ind;
+            bv(ratio_ind)=pivot_col_ind;
+            pivot_value=A(pivot_row_ind,pivot_col_ind);
+            A(pivot_row_ind,:)=A(pivot_row_ind,:)./pivot_value;
+            for i=1:size(A,1)
+                if i~=pivot_row_ind
+                    A(i,:)=A(i,:)-(pivot_col(i)*A(pivot_row_ind,:));
+                end
+            end
+            zjcj=zjcj-(zjcj(pivot_col_ind)*A(pivot_row_ind,:));
+        end
+        ZjC=[zjcj; A];
+        B(1:m)=(A(:,size(A,2)))';
+        simpTable=array2table(ZjC);
+        simpTable.Properties.VariableNames(1:size(ZjC,2))={'x1','x2','s1','s2','s3','Sol'};
+        fprintf("TABLE %d:\n",table);
+        table=table+1;
+        disp(simpTable);
+    else
+        RUN=false;
+    end
+end
+
+%% PHASE 5: OPTIMAL SOLUTION
+
+if optimal==true
+    fprintf("FINAL TABLE:\n");
+    disp(simpTable);
+    fprintf("OPTIMAL SOLUTION:\n");
+    for i=1:col
+        index=find(bv==i);
+        if(index==0)
+            fprintf("x%d = 0\n",i);
+        else
+            fprintf("x%d = %.3f\n",i,A(index,size(A,2)));
+        end
+    end
+    fprintf("Max Z = %f",ZjC(1,size(ZjC,2)));
+end
+
+
+%%big m
+clc
+clear
+format rat
+
+% MIN Z=2x1+x2
+% 3x1+x2=3;
+% 4x1+3x2>=6
+% x1+2x2<=3
+
+%% PHASE 1: INPUT PARAMETER
+
+A=[3 1; 4 3; 1 2];
+B=[3; 6; 3];
+Z=[-2 -1];
+
+%% PHASE 2: STANDARD FORM
+
+s=eye(size(A,1));
+m=size(A,1);
+n=size(A,2);
+col=size(A,2);
+M=1000;
+I=[2 1 0];
+
+greater_than=find(I==1);
+for i=1:size(greater_than,2)
+    mat=zeros(1,m);
+    mat(greater_than(i))=-1;
+    mat=mat';
+    A=[A mat];
+end
+artificial_var=find(I==2 | I==1);
+artificial_var_in_table(1:size(artificial_var,2))=(artificial_var+size(A,2));
+A=[A s B];
+Cj=zeros(1,size(A,2));
+Cj(1:n)=Z;
+
+for i=1:size(artificial_var_in_table,2)
+    Cj(artificial_var_in_table(i))=-M;
+end
+
+%% PHASE 3: FIRST TABLE
+
+bv=(n+size(greater_than,2)+1):size(A,2)-1;
+zjcj=Cj(bv)*A-Cj;
+fprintf("INITIAL TABLE:\n");
+ZjC=[zjcj; A];
+simpTable=array2table(ZjC);
+simpTable.Properties.VariableNames(1:size(ZjC,2))={'x1','x2','s1','a1','a2','s2','Sol'};
+disp(simpTable);
+
+%% PHASE 4: BIG-M METHOD- SIMPLEX TABLES
+
+table=1;
+RUN=true;
+zc=zjcj(1:size(A,2)-1);
+
+while RUN
+    if any(zc<0)
+        [minvalzjcj, minindzjcj]=min(zc);
+        pivot_col_ind=minindzjcj;
+        pivot_col=A(:,pivot_col_ind);
+        if all(pivot_col<=0)
+            print('LPP is unbounded');
+        else
+            for i=1:size(pivot_col,1)
+                if pivot_col(i)>0
+                    ratio(i)=B(i)./pivot_col(i);
+                else
+                    ratio(i)=inf;
+                end
+            end
+            [min_ratio, ratio_ind]=min(ratio);
+            pivot_row_ind=ratio_ind;
+            bv(ratio_ind)=pivot_col_ind;
+            pivot_value=A(pivot_row_ind,pivot_col_ind);
+            A(pivot_row_ind,:)=A(pivot_row_ind,:)./pivot_value;
+            for i=1:size(A,1)
+                if i~=pivot_row_ind
+                    A(i,:)=A(i,:)-(pivot_col(i)*A(pivot_row_ind,:));
+                end
+            end
+            zjcj=zjcj-(zjcj(pivot_col_ind)*A(pivot_row_ind,:));
+        end
+        ZjC=[zjcj; A];
+        zc=zjcj(1:size(A,2)-1);
+        B(1:m)=(A(:,size(A,2)))';
+        simpTable=array2table(ZjC);
+        simpTable.Properties.VariableNames(1:size(ZjC,2))={'x1','x2','s1','a1','a2','s2','Sol'};
+        fprintf("TABLE %d:\n",table);
+        table=table+1;
+        disp(simpTable);
+    else
+        RUN=false;
+    end
+end
+
+%% PHASE 5: OPTIMAL SOLUTION
+
+fprintf("FINAL TABLE:\n");
+disp(simpTable);
+
+optimal=true;
+
+for i=1:size(bv,2)
+    index=find(artificial_var_in_table==bv(i));
+    if index~=0
+        optimal=false;
+    end
+end
+
+if optimal==false
+    disp('INFEASIBLE SOLUTION');
+else
+    fprintf("OPTIMAL SOLUTION:\n");
+    for i=1:col
+        index=find(bv==i);
+        if(index>0)
+            fprintf("x%d = %.3f\n",i,A(index,size(A,2)));
+        else
+            fprintf("x%d = 0\n",i);
+        end
+    end
+fprintf("Min Z = %f",ZjC(1,size(ZjC,2)));
+end
+
+
+%%two phase
+
+clc
+clear
+format rat
+
+% MIN Z=7.5x1-3x2
+% 3x1-x2-x3>=3
+% x1-x2+x3>=2
+
+%% PHASE 1: INPUT PARAMETER
+
+A=[3 -1 -1; 1 -1 1];
+B=[3; 2];
+Z=[-7.5 3 0];
+
+%% PHASE 2: STANDARD FORM
+
+s=eye(size(A,1));
+m=size(A,1);
+n=size(A,2);
+col=size(A,2);
+I=[1 1];
+greater_than=find(I==1);
+for i=1:size(greater_than,2)
+    mat=zeros(1,m);
+    mat(greater_than(i))=-1;
+    mat=mat';
+    A=[A mat];
+end
+artificial_var=find(I==2 | I==1);
+artificial_var_in_table(1:size(artificial_var,2))=(artificial_var+size(A,2));
+A=[A s B];
+Cj=zeros(1,size(A,2));
+
+for i=1:size(artificial_var_in_table,2)
+    Cj(artificial_var_in_table(i))=-1;
+end
+
+%% PHASE I OF TWO-PHASE METHOD
+
+% FIRST TABLE
+
+bv=(n+size(greater_than,2)+1):size(A,2)-1;
+zjcj=Cj(bv)*A-Cj;
+fprintf("----------PHASE I----------\n\n");
+fprintf("INITIAL TABLE:\n");
+ZjC=[zjcj; A];
+simpTable=array2table(ZjC);
+simpTable.Properties.VariableNames(1:size(ZjC,2))={'x1','x2','x3','s1','s2','a1','a2','Sol'};
+disp(simpTable);
+
+% PHASE I- SIMPLEX TABLES
+
+table=1;
+RUN=true;
+zc=zjcj(1:size(A,2)-1);
+optimal=true;
+
+while RUN
+    if any(zc<0)
+        [minvalzjcj, minindzjcj]=min(zc);
+        pivot_col_ind=minindzjcj;
+        pivot_col=A(:,pivot_col_ind);
+        if all(pivot_col<=0)
+            print('LPP is unbounded');
+            optimal=false;
+            break;
+        else
+            for i=1:size(pivot_col,1)
+                if pivot_col(i)>0
+                    ratio(i)=B(i)./pivot_col(i);
+                else
+                    ratio(i)=inf;
+                end
+            end
+            [min_ratio, ratio_ind]=min(ratio);
+            pivot_row_ind=ratio_ind;
+            bv(ratio_ind)=pivot_col_ind;
+            pivot_value=A(pivot_row_ind,pivot_col_ind);
+            A(pivot_row_ind,:)=A(pivot_row_ind,:)./pivot_value;
+            for i=1:size(A,1)
+                if i~=pivot_row_ind
+                    A(i,:)=A(i,:)-(pivot_col(i)*A(pivot_row_ind,:));
+                end
+            end
+            zjcj=zjcj-(zjcj(pivot_col_ind)*A(pivot_row_ind,:));
+        end
+        ZjC=[zjcj; A];
+        zc=zjcj(1:size(A,2)-1);
+        B(1:m)=(A(:,size(A,2)))';
+        simpTable=array2table(ZjC);
+        simpTable.Properties.VariableNames(1:size(ZjC,2))={'x1','x2','x3','s1','s2','a1','a2','Sol'};
+        fprintf("TABLE %d:\n",table);
+        table=table+1;
+        disp(simpTable);
+    else
+        RUN=false;
+    end
+end
+
+
+%% PHASE II OF TWO-PHASE METHOD
+
+optimal=true;
+
+for i=1:size(bv,2)
+    index=find(artificial_var_in_table==bv(i));
+    if index~=0
+        optimal=false;
+    end
+end
+
+if optimal==false
+    disp('INFEASIBLE SOLUTION');
+else
+    fprintf("\n\n----------PHASE II----------\n");
+    artificial_variables_number=size(artificial_var_in_table,2);
+    A=A(1:end,1:end-artificial_variables_number-1);
+    A=[A B];
+    Cj=zeros(1,size(A,2));
+    Cj(1:n)=Z;
+    
+    % FIRST TABLE
+    zjcj=Cj(bv)*A-Cj;
+    fprintf("INITIAL TABLE:\n");
+    ZjC=[zjcj; A];
+    simpTable=array2table(ZjC);
+    simpTable.Properties.VariableNames(1:size(ZjC,2))={'x1','x2','x3','s1','s2','Sol'};
+    disp(simpTable);
+    
+    % PHASE II SIMPLEX TABLES
+    table=1;
+    RUN=true;
+    zc=zjcj(1:size(A,2)-1);
+    optimal=true;
+    
+    while RUN
+        if any(zc<0)
+            [minvalzjcj, minindzjcj]=min(zc);
+            pivot_col_ind=minindzjcj;
+            pivot_col=A(:,pivot_col_ind);
+            if all(pivot_col<=0)
+                disp('LPP is unbounded');
+                optimal=false;
+                break;
+            else
+                for i=1:size(pivot_col,1)
+                    if pivot_col(i)>0
+                        ratio(i)=B(i)./pivot_col(i);
+                    else
+                        ratio(i)=inf;
+                    end
+                end
+                [min_ratio, ratio_ind]=min(ratio);
+                pivot_row_ind=ratio_ind;
+                bv(ratio_ind)=pivot_col_ind;
+                pivot_value=A(pivot_row_ind,pivot_col_ind);
+                A(pivot_row_ind,:)=A(pivot_row_ind,:)./pivot_value;
+                for i=1:size(A,1)
+                    if i~=pivot_row_ind
+                        A(i,:)=A(i,:)-(pivot_col(i)*A(pivot_row_ind,:));
+                    end
+                end
+                zjcj=zjcj-(zjcj(pivot_col_ind)*A(pivot_row_ind,:));
+            end
+            ZjC=[zjcj; A];
+            zc=zjcj(1:size(A,2)-1);
+            B(1:m)=(A(:,size(A,2)))';
+            simpTable=array2table(ZjC);
+            simpTable.Properties.VariableNames(1:size(ZjC,2))={'x1','x2','x3','s1','s2','Sol'};
+            fprintf("TABLE %d:\n",table);
+            table=table+1;
+            disp(simpTable);
+        else
+            RUN=false;
+        end
+    end
+    
+    % OPTIMAL SOLUTION
+    
+    if optimal==true
+        fprintf("FINAL TABLE:\n");
+        disp(simpTable);
+        fprintf("OPTIMAL SOLUTION:\n");
+        for i=1:col
+            index=find(bv==i);
+            if(index>0)
+                fprintf("x%d = %.3f\n",i,A(index,size(A,2)));
+            else
+                fprintf("x%d = %d\n",i,0);
+            end
+        end
+        fprintf("Min Z = %f",ZjC(1,size(ZjC,2)));
+    end
+end
